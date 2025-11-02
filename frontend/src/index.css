@@ -1,0 +1,318 @@
+/* Tailwind directives */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+/* Base styles */
+@layer base {
+  html {
+    font-family: 'Inter', sans-serif;
+  }
+  
+  body {
+    @apply bg-trust-50 text-warm-900 antialiased;
+    font-family: 'Inter', sans-serif;
+    line-height: 1.6;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold text-warm-900;
+  }
+
+  h1 {
+    @apply text-3xl md:text-4xl;
+  }
+
+  h2 {
+    @apply text-2xl md:text-3xl;
+  }
+
+  h3 {
+    @apply text-xl md:text-2xl;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-trust-100;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-trust-400 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-trust-500;
+  }
+}
+
+/* Custom components */
+@layer components {
+  /* Buttons */
+  .btn-primary {
+    @apply w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-semibold text-white bg-trust-500 hover:bg-trust-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-trust-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.02] active:scale-[0.98];
+  }
+  
+  .btn-secondary {
+    @apply w-full flex justify-center items-center py-3 px-4 border border-warm-300 rounded-xl shadow-sm text-sm font-semibold text-warm-700 bg-white hover:bg-warm-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-trust-500 transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98];
+  }
+  
+  .btn-success {
+    @apply w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-xl shadow-sm text-sm font-semibold text-white bg-success-500 hover:bg-success-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-success-500 transition-all duration-200 transform hover:scale-[1.02] active:scale-[0.98];
+  }
+
+  .btn-outline {
+    @apply w-full flex justify-center items-center py-3 px-4 border border-trust-300 rounded-xl shadow-sm text-sm font-semibold text-trust-600 bg-white hover:bg-trust-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-trust-500 transition-all duration-200;
+  }
+
+  /* Input fields */
+  .input-primary {
+    @apply block w-full px-4 py-3 border border-warm-300 rounded-xl placeholder-warm-400 focus:outline-none focus:ring-2 focus:ring-trust-500 focus:border-transparent transition-all duration-200 bg-white text-warm-900 text-sm font-normal;
+  }
+
+  .input-error {
+    @apply block w-full px-4 py-3 border border-red-300 rounded-xl placeholder-warm-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all duration-200 bg-white text-warm-900 text-sm font-normal;
+  }
+
+  /* Cards */
+  .card {
+    @apply bg-white rounded-2xl shadow-soft border border-warm-100 p-6;
+  }
+
+  .card-hover {
+    @apply card transition-all duration-200 hover:shadow-lg hover:border-trust-200 cursor-pointer;
+  }
+
+  /* Alerts */
+  .alert-error {
+    @apply bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm flex items-start space-x-2;
+  }
+
+  .alert-success {
+    @apply bg-success-50 border border-success-200 text-success-700 px-4 py-3 rounded-xl text-sm flex items-start space-x-2;
+  }
+
+  .alert-warning {
+    @apply bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded-xl text-sm flex items-start space-x-2;
+  }
+
+  .alert-info {
+    @apply bg-trust-50 border border-trust-200 text-trust-700 px-4 py-3 rounded-xl text-sm flex items-start space-x-2;
+  }
+
+  /* Navigation */
+  .nav-item {
+    @apply flex items-center px-4 py-3 text-warm-600 hover:text-trust-600 hover:bg-trust-50 rounded-xl transition-all duration-200 font-medium;
+  }
+
+  .nav-item-active {
+    @apply flex items-center px-4 py-3 text-trust-600 bg-trust-50 rounded-xl font-semibold;
+  }
+
+  /* Badges */
+  .badge-success {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-success-100 text-success-800;
+  }
+
+  .badge-warning {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800;
+  }
+
+  .badge-error {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800;
+  }
+
+  .badge-info {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-trust-100 text-trust-800;
+  }
+
+  /* Loading spinner */
+  .spinner {
+    @apply animate-spin rounded-full h-5 w-5 border-2 border-trust-200 border-t-trust-500;
+  }
+
+  /* Progress bars */
+  .progress-bar {
+    @apply w-full bg-warm-200 rounded-full h-2;
+  }
+
+  .progress-fill {
+    @apply bg-trust-500 h-2 rounded-full transition-all duration-500;
+  }
+}
+
+/* Custom utilities */
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  
+  .gradient-bg {
+    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  }
+  
+  .trust-gradient {
+    background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%);
+  }
+
+  .success-gradient {
+    background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+  }
+
+  .glass-effect {
+    background: rgba(255, 255, 255, 0.25);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+  }
+
+  .shadow-glow {
+    box-shadow: 0 0 20px -5px rgba(14, 165, 233, 0.3);
+  }
+
+  .animate-float {
+    animation: float 3s ease-in-out infinite;
+  }
+
+  .animate-pulse-slow {
+    animation: pulse 3s ease-in-out infinite;
+  }
+}
+
+/* Custom animations */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-in {
+  animation: slide-in 0.3s ease-out;
+}
+
+/* Focus styles for accessibility */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+a:focus-visible {
+  @apply outline-none ring-2 ring-trust-500 ring-offset-2 ring-offset-trust-50;
+}
+
+/* Selection styles */
+::selection {
+  @apply bg-trust-200 text-trust-900;
+}
+
+::-moz-selection {
+  @apply bg-trust-200 text-trust-900;
+}
+
+/* Print styles */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  
+  .break-after-page {
+    page-break-after: always;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .btn-primary {
+    @apply border-2 border-current;
+  }
+  
+  .input-primary {
+    @apply border-2;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Custom scrollbar for Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #7dd3fc #f0f9ff;
+}
+
+/* Smooth transitions for all interactive elements */
+button,
+input,
+select,
+textarea,
+a {
+  transition: color 150ms ease-in-out, 
+              background-color 150ms ease-in-out, 
+              border-color 150ms ease-in-out,
+              transform 150ms ease-in-out,
+              box-shadow 150ms ease-in-out;
+}
+
+/* Ensure images are responsive */
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Custom styles for form elements */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* Custom placeholder styles */
+::placeholder {
+  @apply text-warm-400;
+}
+
+::-webkit-input-placeholder {
+  @apply text-warm-400;
+}
+
+::-moz-placeholder {
+  @apply text-warm-400;
+}
+
+:-ms-input-placeholder {
+  @apply text-warm-400;
+}
+
+:-moz-placeholder {
+  @apply text-warm-400;
+}
