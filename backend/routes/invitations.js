@@ -13,7 +13,7 @@ console.log('========================================');
 console.log('TWILIO_ACCOUNT_SID:', process.env.TWILIO_ACCOUNT_SID ? '✅ Loaded' : '❌ MISSING');
 console.log('TWILIO_AUTH_TOKEN:', process.env.TWILIO_AUTH_TOKEN ? '✅ Loaded' : '❌ MISSING');
 console.log('TWILIO_PHONE_NUMBER:', process.env.TWILIO_PHONE_NUMBER ? '✅ Loaded' : '❌ MISSING');
-console.log('FRONTEND_URL:', process.env.FRONTEND_URL || process.env.REACT_APP_FRONTEND_URL || '❌ MISSING');
+console.log('FRONTEND_URL:', process.env.FRONTEND_URL || '❌ MISSING');
 console.log('========================================\n');
 
 // Initialize Twilio
@@ -22,11 +22,108 @@ const twilioClient = twilio(
   process.env.TWILIO_AUTH_TOKEN
 );
 
+// ============================================
+// PUBLIC ROUTE - Get invitation details
+// ============================================
+// GET /api/invitations/:invitationId - Get invitation details (NO AUTH REQUIRED)
+router.get('/:invitationId', async (req, res) => {
+  try {
+    const { invitationId } = req.params;
+
+    console.log('📨 Fetching invitation:', invitationId);
+
+    // Find invitation
+    const invitation = await Invitation.findById(invitationId)
+      .populate('group', 'name description purpose admin')
+      .populate('invitedBy', 'name phone');
+    
+    if (!invitation) {
+      console.log('❌ Invitation not found:', invitationId);
+      return res.status(404).json({
+        success: false,
+        error: 'Invitation not found'
+      });
+    }
+
+    console.log('✅ Invitation found:', {
+      id: invitation._id,
+      status: invitation.status,
+      group: invitation.group.name
+    });
+
+    // Check if invitation is still valid
+    if (invitation.status === 'accepted') {
+      return res.status(200).json({
+        success: true,
+        message: 'This invitation has already been accepted',
+        data: {
+          invitation: {
+            _id: invitation._id,
+            status: invitation.status,
+            phone: invitation.phone,
+            name: invitation.name
+          },
+          group: {
+            _id: invitation.group._id,
+            name: invitation.group.name,
+            description: invitation.group.description
+          }
+        }
+      });
+    }
+
+    if (invitation.status === 'expired' || invitation.status === 'failed') {
+      return res.status(400).json({
+        success: false,
+        error: 'This invitation has expired or is no longer valid',
+        status: invitation.status
+      });
+    }
+
+    // Return invitation details
+    res.json({
+      success: true,
+      data: {
+        invitation: {
+          _id: invitation._id,
+          status: invitation.status,
+          phone: invitation.phone,
+          name: invitation.name,
+          method: invitation.method,
+          createdAt: invitation.createdAt
+        },
+        group: {
+          _id: invitation.group._id,
+          name: invitation.group.name,
+          description: invitation.group.description,
+          purpose: invitation.group.purpose
+        },
+        invitedBy: {
+          name: invitation.invitedBy.name
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error fetching invitation:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch invitation details'
+    });
+  }
+});
+
+// ============================================
+// PROTECTED ROUTES (require auth)
+// ============================================
+
 // POST /api/invitations/send - Send invitations
 router.post('/send', auth, async (req, res) => {
   try {
     const { groupId, members, method } = req.body;
     const userId = req.user.id;
+
+    console.log('📤 Sending invitations:', { groupId, method, memberCount: members.length });
 
     // Get group details
     const group = await Group.findById(groupId);
@@ -62,20 +159,25 @@ router.post('/send', auth, async (req, res) => {
 
         await invitation.save();
 
-        // Generate invite link - use FRONTEND_URL from env
-        const frontendUrl = process.env.FRONTEND_URL || process.env.REACT_APP_FRONTEND_URL || 'http://localhost:5173';
+        // Generate invite link - Frontend URL
+        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
         const inviteLink = `${frontendUrl}/invite/${invitation._id}`;
+        
+        console.log('🔗 Generated invite link:', inviteLink);
         
         // Prepare message
         const message = `Hello${member.name ? ` ${member.name}` : ''}! You've been invited by ${req.user.name} to join the savings group "${group.name}". Click here to join: ${inviteLink}`;
 
         let sendResult;
         if (method === 'sms') {
+          console.log('📱 Sending SMS to:', member.phone);
           sendResult = await sendSMS(member.phone, message);
         } else if (method === 'whatsapp') {
+          console.log('💬 Sending WhatsApp to:', member.phone);
           sendResult = await sendWhatsApp(member.phone, message);
         } else {
           // For link method, just return the link
+          console.log('🔗 Link method - no message sent');
           sendResult = { success: true, link: inviteLink };
         }
 
@@ -84,9 +186,11 @@ router.post('/send', auth, async (req, res) => {
         if (sendResult.success) {
           invitation.messageId = sendResult.messageId;
           invitation.status = 'sent';
+          console.log('✅ Message sent successfully:', sendResult.messageId);
         } else {
           invitation.status = 'failed';
           invitation.error = sendResult.error;
+          console.log('❌ Message failed:', sendResult.error);
         }
         await invitation.save();
 
@@ -100,7 +204,7 @@ router.post('/send', auth, async (req, res) => {
         });
 
       } catch (memberError) {
-        console.error(`Error processing member ${member.phone}:`, memberError);
+        console.error(`❌ Error processing member ${member.phone}:`, memberError);
         results.push({
           member: member.phone,
           name: member.name,
@@ -121,7 +225,7 @@ router.post('/send', auth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error sending invitations:', error);
+    console.error('❌ Error sending invitations:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to send invitations'
@@ -156,7 +260,7 @@ router.get('/group/:groupId', auth, async (req, res) => {
     }
 
     // Get pending invitations (only admin sees all)
-    const query = { group: groupId, status: 'pending' };
+    const query = { group: groupId, status: { $in: ['pending', 'sent'] } };
     if (!isAdmin) {
       // Regular members only see their own invitations
       query.invitedBy = userId;
@@ -172,7 +276,7 @@ router.get('/group/:groupId', auth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error fetching invitations:', error);
+    console.error('❌ Error fetching invitations:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to fetch invitations'
@@ -186,6 +290,8 @@ router.post('/:invitationId/accept', auth, async (req, res) => {
     const { invitationId } = req.params;
     const userId = req.user.id;
 
+    console.log('✅ Accepting invitation:', { invitationId, userId });
+
     // Find invitation
     const invitation = await Invitation.findById(invitationId)
       .populate('group');
@@ -197,10 +303,11 @@ router.post('/:invitationId/accept', auth, async (req, res) => {
       });
     }
 
-    if (invitation.status !== 'pending') {
+    if (invitation.status !== 'pending' && invitation.status !== 'sent') {
       return res.status(400).json({
         success: false,
-        error: 'Invitation already used or expired'
+        error: 'Invitation already used or expired',
+        status: invitation.status
       });
     }
 
@@ -211,6 +318,7 @@ router.post('/:invitationId/accept', auth, async (req, res) => {
     );
 
     if (isAlreadyMember) {
+      console.log('⚠️ User already a member');
       return res.status(400).json({
         success: false,
         error: 'You are already a member of this group'
@@ -225,12 +333,14 @@ router.post('/:invitationId/accept', auth, async (req, res) => {
     });
 
     await group.save();
+    console.log('✅ User added to group');
 
     // Update invitation status
     invitation.status = 'accepted';
     invitation.acceptedAt = new Date();
     invitation.acceptedBy = userId;
     await invitation.save();
+    console.log('✅ Invitation marked as accepted');
 
     res.json({
       success: true,
@@ -248,7 +358,7 @@ router.post('/:invitationId/accept', auth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error accepting invitation:', error);
+    console.error('❌ Error accepting invitation:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to accept invitation'
@@ -288,13 +398,17 @@ router.delete('/:invitationId', auth, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error cancelling invitation:', error);
+    console.error('❌ Error cancelling invitation:', error);
     res.status(500).json({
       success: false,
       error: 'Failed to cancel invitation'
     });
   }
 });
+
+// ============================================
+// HELPER FUNCTIONS
+// ============================================
 
 // Helper function to send SMS
 async function sendSMS(to, message) {
@@ -311,7 +425,7 @@ async function sendSMS(to, message) {
       status: response.status
     };
   } catch (error) {
-    console.error('Twilio SMS error:', error);
+    console.error('❌ Twilio SMS error:', error);
     return {
       success: false,
       error: error.message
@@ -337,7 +451,7 @@ async function sendWhatsApp(to, message) {
       status: response.status
     };
   } catch (error) {
-    console.error('Twilio WhatsApp error:', error);
+    console.error('❌ Twilio WhatsApp error:', error);
     return {
       success: false,
       error: error.message

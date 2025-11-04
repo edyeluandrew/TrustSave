@@ -51,6 +51,7 @@ function App() {
             <Route path="/create-group" element={<CreateGroup />} />
             <Route path="/groups" element={<GroupsDashboard />} />
             <Route path="/groups/:groupId" element={<GroupDetails />} />
+            {/* SMS Invitation Route - uses invitationId param */}
             <Route path="/invite/:invitationId" element={<InvitationAccept />} />
           </Routes>
         </div>

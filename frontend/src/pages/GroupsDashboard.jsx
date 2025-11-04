@@ -18,7 +18,11 @@ import {
   MoreVertical,
   UserCheck,
   Clock,
-  AlertCircle
+  AlertCircle,
+  X,
+  Phone,
+  Mail,
+  Crown
 } from 'lucide-react';
 
 const GroupsDashboard = () => {
@@ -27,6 +31,8 @@ const GroupsDashboard = () => {
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [selectedGroup, setSelectedGroup] = useState(null);
+  const [showMembersModal, setShowMembersModal] = useState(false);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -43,6 +49,18 @@ const GroupsDashboard = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Open members modal
+  const handleShowMembers = (group) => {
+    setSelectedGroup(group);
+    setShowMembersModal(true);
+  };
+
+  // Close members modal
+  const handleCloseModal = () => {
+    setShowMembersModal(false);
+    setSelectedGroup(null);
   };
 
   // Filter groups based on search and status
@@ -270,13 +288,17 @@ const GroupsDashboard = () => {
                 
                 {/* Group Stats */}
                 <div className="grid grid-cols-2 gap-4 text-sm mb-4">
-                  <div className="flex items-center space-x-2">
-                    <Users className="h-4 w-4 text-warm-500" />
-                    <div>
+                  {/* Members - Clickable */}
+                  <button
+                    onClick={() => handleShowMembers(group)}
+                    className="flex items-center space-x-2 hover:bg-warm-50 p-2 rounded-lg transition-colors cursor-pointer"
+                  >
+                    <Users className="h-4 w-4 text-trust-500" />
+                    <div className="text-left">
                       <p className="text-warm-500 text-xs">Members</p>
-                      <p className="font-medium text-warm-900">{group.members.length}</p>
+                      <p className="font-medium text-trust-600 underline">{group.members.length}</p>
                     </div>
-                  </div>
+                  </button>
                   
                   <div className="flex items-center space-x-2">
                     <Wallet className="h-4 w-4 text-warm-500" />
@@ -389,16 +411,108 @@ const GroupsDashboard = () => {
             </div>
           </div>
         )}
-
-        {/* Loading more indicator */}
-        {filteredGroups.length > 0 && groups.length > 6 && (
-          <div className="text-center mt-8">
-            <button className="btn-outline">
-              Load More Groups
-            </button>
-          </div>
-        )}
       </div>
+
+      {/* Members Modal */}
+      {showMembersModal && selectedGroup && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden">
+            {/* Modal Header */}
+            <div className="bg-trust-500 text-white p-6 flex justify-between items-center">
+              <div>
+                <h2 className="text-2xl font-bold">{selectedGroup.name}</h2>
+                <p className="text-trust-100 text-sm mt-1">
+                  {selectedGroup.members.length} {selectedGroup.members.length === 1 ? 'Member' : 'Members'}
+                </p>
+              </div>
+              <button
+                onClick={handleCloseModal}
+                className="p-2 hover:bg-trust-600 rounded-lg transition-colors"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            {/* Members List */}
+            <div className="p-6 overflow-y-auto max-h-[calc(80vh-120px)]">
+              <div className="space-y-3">
+                {selectedGroup.members.map((member, index) => (
+                  <div
+                    key={member._id || index}
+                    className="flex items-center justify-between p-4 bg-warm-50 rounded-xl hover:bg-warm-100 transition-colors"
+                  >
+                    <div className="flex items-center space-x-4">
+                      {/* Avatar */}
+                      <div className="h-12 w-12 rounded-full bg-trust-100 flex items-center justify-center">
+                        <span className="text-trust-600 font-semibold text-lg">
+                          {member.name?.charAt(0) || 'U'}
+                        </span>
+                      </div>
+                      
+                      {/* Member Info */}
+                      <div>
+                        <div className="flex items-center space-x-2">
+                          <p className="font-semibold text-warm-900">{member.name}</p>
+                          {selectedGroup.admin._id === member._id && (
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-warning-100 text-warning-700">
+                              <Crown className="h-3 w-3 mr-1" />
+                              Admin
+                            </span>
+                          )}
+                        </div>
+                        
+                        {/* Contact Info */}
+                        <div className="flex flex-col space-y-1 mt-1">
+                          <div className="flex items-center space-x-2 text-sm text-warm-600">
+                            <Phone className="h-3 w-3" />
+                            <span>{member.phone}</span>
+                          </div>
+                          {member.email && (
+                            <div className="flex items-center space-x-2 text-sm text-warm-600">
+                              <Mail className="h-3 w-3" />
+                              <span>{member.email}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex items-center space-x-2">
+                      <a
+                        href={`tel:${member.phone}`}
+                        className="p-2 bg-trust-100 hover:bg-trust-200 text-trust-600 rounded-lg transition-colors"
+                        title="Call"
+                      >
+                        <Phone className="h-4 w-4" />
+                      </a>
+                      {member.email && (
+                        <a
+                          href={`mailto:${member.email}`}
+                          className="p-2 bg-trust-100 hover:bg-trust-200 text-trust-600 rounded-lg transition-colors"
+                          title="Email"
+                        >
+                          <Mail className="h-4 w-4" />
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-6 bg-warm-50 border-t border-warm-200">
+              <button
+                onClick={handleCloseModal}
+                className="w-full bg-trust-500 hover:bg-trust-600 text-white py-3 rounded-lg font-semibold transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
