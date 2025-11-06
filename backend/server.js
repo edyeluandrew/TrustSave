@@ -7,6 +7,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import connectDB from './config/database.js';
 import Invitation from './models/Invitation.js';
+import contributions from './routes/contributions.js';
+
 
 // Import routes
 import authRoutes from './routes/auth.js';
@@ -54,6 +56,8 @@ app.use('/api/groups', groupsRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/invitations', invitationsRoutes);
 app.use('/api/join-requests', joinRequestsRoutes);
+app.use('/api/contributions', contributions);
+
 
 // ============================================
 // BASIC API ROUTES

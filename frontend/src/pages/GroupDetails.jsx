@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import api from '../services/api';
-import invitationService from '../services/invitationService'; // Add this import
-import PendingRequests from '../components/PendingRequests'; // Add this import
+import { useAuth } from '../context/AuthContext.jsx';
+import api from '../services/api.jsx';
+import invitationService from '../services/invitationService.jsx';
+import { contributionService } from '../services/contributionService.jsx';
+import PendingRequests from '../components/PendingRequests.jsx';
+import ContributionModal from '../components/ContributionModal.jsx';
 import {
   Users,
   Calendar,
@@ -29,7 +31,7 @@ import {
   Shield,
   PieChart,
   Send,
-  Link as LinkIcon // Add this import
+  Link as LinkIcon
 } from 'lucide-react';
 
 const GroupDetails = () => {
@@ -42,15 +44,21 @@ const GroupDetails = () => {
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('overview');
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showContributionModal, setShowContributionModal] = useState(false);
   const [inviteMembers, setInviteMembers] = useState([{ id: `member-${Date.now()}-${Math.random()}`, name: '', phone: '' }]);
   const [inviteLoading, setInviteLoading] = useState(false);
   const [inviteError, setInviteError] = useState('');
   const [focusedField, setFocusedField] = useState(null);
-  const [inviteMethod, setInviteMethod] = useState('sms'); // Add this state
+  const [inviteMethod, setInviteMethod] = useState('sms');
+  const [contributions, setContributions] = useState([]);
+  const [contributionsLoading, setContributionsLoading] = useState(false);
 
   useEffect(() => {
     fetchGroupDetails();
-  }, [groupId]);
+    if (activeTab === 'transactions') {
+      fetchContributions();
+    }
+  }, [groupId, activeTab]);
 
   const fetchGroupDetails = async () => {
     try {
@@ -64,10 +72,21 @@ const GroupDetails = () => {
     }
   };
 
-  // FIXED: Proper admin check with toString() to handle ObjectId vs string comparison
+  const fetchContributions = async () => {
+    setContributionsLoading(true);
+    try {
+      const data = await contributionService.getGroupContributions(groupId);
+      setContributions(data);
+    } catch (error) {
+      console.error('Error fetching contributions:', error);
+    } finally {
+      setContributionsLoading(false);
+    }
+  };
+
   const isAdmin = group?.admin?._id?.toString() === user?._id?.toString();
 
-  // Mock data for loans and transactions
+  // Mock data for loans
   const mockLoans = [
     {
       id: 1,
@@ -93,46 +112,16 @@ const GroupDetails = () => {
     }
   ];
 
-  const mockTransactions = [
-    {
-      id: 1,
-      type: 'contribution',
-      memberName: 'You',
-      amount: 10000,
-      date: '2024-01-15',
-      status: 'completed',
-      description: 'Monthly contribution'
-    },
-    {
-      id: 2,
-      type: 'loan_disbursement',
-      memberName: 'John Doe',
-      amount: 50000,
-      date: '2024-01-10',
-      status: 'completed',
-      description: 'Business loan'
-    },
-    {
-      id: 3,
-      type: 'contribution',
-      memberName: 'Jane Smith',
-      amount: 10000,
-      date: '2024-01-08',
-      status: 'completed',
-      description: 'Monthly contribution'
-    },
-    {
-      id: 4,
-      type: 'loan_repayment',
-      memberName: 'John Doe',
-      amount: 15000,
-      date: '2024-01-20',
-      status: 'completed',
-      description: 'Loan installment'
+  const handleContributionSuccess = (result) => {
+    // Refresh contributions list if on transactions tab
+    if (activeTab === 'transactions') {
+      fetchContributions();
     }
-  ];
+    // Show success message
+    alert(`Contribution initiated! Transaction ID: ${result.contribution.transactionId}`);
+  };
 
-  // Invite Members Functions - FIXED with useCallback to prevent re-renders
+  // Invite Members Functions
   const addInviteField = useCallback(() => {
     setInviteMembers(prev => [...prev, { id: `member-${Date.now()}-${Math.random()}`, name: '', phone: '' }]);
   }, []);
@@ -155,60 +144,52 @@ const GroupDetails = () => {
   const resetInviteForm = () => {
     setInviteMembers([{ id: `member-${Date.now()}-${Math.random()}`, name: '', phone: '' }]);
     setInviteError('');
-    setInviteMethod('sms'); // Reset to default method
+    setInviteMethod('sms');
   };
 
-const handleInviteMembers = async () => {
-  // Filter out empty entries
-  const validMembers = inviteMembers.filter(member => 
-    member.name.trim() && member.phone.trim()
-  );
-
-  if (validMembers.length === 0) {
-    setInviteError('Please add at least one member with name and phone number');
-    return;
-  }
-
-  // Validate phone numbers
-  const invalidPhones = validMembers.filter(member => !/^\+?[\d\s-()]{10,}$/.test(member.phone.trim()));
-  if (invalidPhones.length > 0) {
-    setInviteError('Please enter valid phone numbers for all members');
-    return;
-  }
-
-  setInviteLoading(true);
-  setInviteError('');
-
-  try {
-    // Use the real invitation service with Twilio
-    const result = await invitationService.createInvitations(
-      group._id, 
-      validMembers, 
-      inviteMethod
+  const handleInviteMembers = async () => {
+    const validMembers = inviteMembers.filter(member => 
+      member.name.trim() && member.phone.trim()
     );
 
-    if (result.success) {
-      // Success - close modal and reset form
-      setShowInviteModal(false);
-      resetInviteForm();
-      
-      // Show success message with results
-      const successfulSends = result.sendResults.filter(r => r.success).length;
-      alert(`Successfully sent ${successfulSends}/${validMembers.length} invitations via ${inviteMethod.toUpperCase()}!`);
-      
-      // Refresh group details
-      fetchGroupDetails();
-    } else {
-      setInviteError(result.error || 'Failed to send invitations');
+    if (validMembers.length === 0) {
+      setInviteError('Please add at least one member with name and phone number');
+      return;
     }
-    
-  } catch (err) {
-    setInviteError('Failed to invite members. Please try again.');
-    console.error('Invitation error:', err);
-  } finally {
-    setInviteLoading(false);
-  }
-};
+
+    const invalidPhones = validMembers.filter(member => !/^\+?[\d\s-()]{10,}$/.test(member.phone.trim()));
+    if (invalidPhones.length > 0) {
+      setInviteError('Please enter valid phone numbers for all members');
+      return;
+    }
+
+    setInviteLoading(true);
+    setInviteError('');
+
+    try {
+      const result = await invitationService.createInvitations(
+        group._id, 
+        validMembers, 
+        inviteMethod
+      );
+
+      if (result.success) {
+        setShowInviteModal(false);
+        resetInviteForm();
+        const successfulSends = result.sendResults.filter(r => r.success).length;
+        alert(`Successfully sent ${successfulSends}/${validMembers.length} invitations via ${inviteMethod.toUpperCase()}!`);
+        fetchGroupDetails();
+      } else {
+        setInviteError(result.error || 'Failed to send invitations');
+      }
+      
+    } catch (err) {
+      setInviteError('Failed to invite members. Please try again.');
+      console.error('Invitation error:', err);
+    } finally {
+      setInviteLoading(false);
+    }
+  };
 
   // Progress Bar Component
   const ProgressBar = ({ percentage, color = 'trust' }) => (
@@ -220,7 +201,7 @@ const handleInviteMembers = async () => {
     </div>
   );
 
-  // Improved Invite Members Modal with better UX - Memoized to prevent re-creation
+  // Invite Modal Component
   const InviteModal = useMemo(() => {
     if (!showInviteModal) return null;
     
@@ -245,7 +226,6 @@ const handleInviteMembers = async () => {
               Add members to <span className="font-semibold text-trust-600">{group?.name}</span> by entering their names and phone numbers.
             </p>
 
-            {/* Add method selection */}
             <div className="mb-4">
               <label className="block text-sm font-medium text-warm-700 mb-2">
                 Invitation Method
@@ -357,7 +337,6 @@ const handleInviteMembers = async () => {
               </button>
             </div>
 
-            {/* Help text */}
             <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
               <p className="text-blue-700 text-xs">
                 <strong>Method:</strong> {inviteMethod.toUpperCase()} - {
@@ -404,8 +383,14 @@ const handleInviteMembers = async () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-warm-50 to-warm-100">
-      {/* Invite Members Modal */}
+      {/* Modals */}
       {InviteModal}
+      <ContributionModal
+        groupId={groupId}
+        isOpen={showContributionModal}
+        onClose={() => setShowContributionModal(false)}
+        onSuccess={handleContributionSuccess}
+      />
 
       {/* Header */}
       <header className="bg-white shadow-sm border-b border-warm-200 sticky top-0 z-50">
@@ -443,8 +428,11 @@ const handleInviteMembers = async () => {
                   <span>Invite Members</span>
                 </button>
               )}
-              <button className="bg-trust-500 hover:bg-trust-600 text-white text-sm py-2 px-4 rounded-lg flex items-center space-x-2 transition-colors">
-                <Download className="h-4 w-4" />
+              <button 
+                onClick={() => setShowContributionModal(true)}
+                className="bg-trust-500 hover:bg-trust-600 text-white text-sm py-2 px-4 rounded-lg flex items-center space-x-2 transition-colors"
+              >
+                <Wallet className="h-4 w-4" />
                 <span>Contribute</span>
               </button>
             </div>
@@ -613,8 +601,11 @@ const handleInviteMembers = async () => {
                   <div>
                     <h3 className="text-lg font-semibold text-warm-900 mb-4">Quick Actions</h3>
                     <div className="grid grid-cols-2 gap-3">
-                      <button className="bg-trust-500 hover:bg-trust-600 text-white text-sm py-3 rounded-lg transition-colors flex items-center justify-center space-x-2">
-                        <Download className="h-4 w-4" />
+                      <button 
+                        onClick={() => setShowContributionModal(true)}
+                        className="bg-trust-500 hover:bg-trust-600 text-white text-sm py-3 rounded-lg transition-colors flex items-center justify-center space-x-2"
+                      >
+                        <Wallet className="h-4 w-4" />
                         <span>Contribute</span>
                       </button>
                       <button className="bg-transparent border border-warm-300 text-warm-700 hover:bg-warm-50 text-sm py-3 rounded-lg transition-colors flex items-center justify-center space-x-2">
@@ -636,41 +627,47 @@ const handleInviteMembers = async () => {
                 <div>
                   <h3 className="text-lg font-semibold text-warm-900 mb-4">Recent Activity</h3>
                   <div className="space-y-3">
-                    {mockTransactions.slice(0, 5).map((transaction) => (
-                      <div key={transaction.id} className="flex items-center justify-between p-3 bg-warm-50 rounded-lg hover:bg-warm-100 transition-colors">
+                    {contributions.slice(0, 5).map((contribution) => (
+                      <div key={contribution._id} className="flex items-center justify-between p-3 bg-warm-50 rounded-lg hover:bg-warm-100 transition-colors">
                         <div className="flex items-center space-x-3">
                           <div className={`h-8 w-8 rounded-full flex items-center justify-center ${
-                            transaction.type === 'contribution' ? 'bg-trust-100' : 
-                            transaction.type === 'loan_disbursement' ? 'bg-warning-100' : 'bg-success-100'
+                            contribution.status === 'completed' ? 'bg-success-100' : 
+                            contribution.status === 'pending' ? 'bg-warning-100' : 'bg-red-100'
                           }`}>
-                            {transaction.type === 'contribution' ? (
-                              <Download className="h-4 w-4 text-trust-600" />
-                            ) : transaction.type === 'loan_disbursement' ? (
-                              <HandCoins className="h-4 w-4 text-warning-600" />
-                            ) : (
-                              <TrendingUp className="h-4 w-4 text-success-600" />
-                            )}
+                            <Wallet className={`h-4 w-4 ${
+                              contribution.status === 'completed' ? 'text-success-600' : 
+                              contribution.status === 'pending' ? 'text-warning-600' : 'text-red-600'
+                            }`} />
                           </div>
                           <div>
                             <p className="text-sm font-medium text-warm-900">
-                              {transaction.type === 'contribution' ? 'Contribution' : 
-                               transaction.type === 'loan_disbursement' ? 'Loan Disbursed' : 'Loan Repayment'}
+                              Contribution - {contribution.mobileMoneyProvider.toUpperCase()}
                             </p>
-                            <p className="text-xs text-warm-500">{transaction.memberName}</p>
+                            <p className="text-xs text-warm-500">{contribution.userId?.name}</p>
                           </div>
                         </div>
                         <div className="text-right">
-                          <p className={`text-sm font-semibold ${
-                            transaction.type === 'contribution' ? 'text-trust-600' : 'text-success-600'
-                          }`}>
-                            {transaction.amount.toLocaleString()} UGX
+                          <p className="text-sm font-semibold text-trust-600">
+                            {contribution.amount?.toLocaleString()} UGX
                           </p>
                           <p className="text-xs text-warm-500">
-                            {new Date(transaction.date).toLocaleDateString()}
+                            {new Date(contribution.createdAt).toLocaleDateString()}
                           </p>
                         </div>
                       </div>
                     ))}
+                    {contributions.length === 0 && (
+                      <div className="text-center py-8">
+                        <Wallet className="h-12 w-12 text-warm-300 mx-auto mb-2" />
+                        <p className="text-warm-500">No contributions yet</p>
+                        <button 
+                          onClick={() => setShowContributionModal(true)}
+                          className="text-trust-600 hover:text-trust-700 text-sm mt-2"
+                        >
+                          Be the first to contribute
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -835,55 +832,79 @@ const handleInviteMembers = async () => {
             {activeTab === 'transactions' && (
               <div>
                 <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-lg font-semibold text-warm-900">Recent Transactions</h3>
-                  <button className="bg-transparent border border-warm-300 text-warm-700 hover:bg-warm-50 text-sm py-2 px-4 rounded-lg transition-colors flex items-center space-x-2">
-                    <PieChart className="h-4 w-4" />
-                    <span>View Report</span>
+                  <h3 className="text-lg font-semibold text-warm-900">Recent Contributions</h3>
+                  <button 
+                    onClick={() => setShowContributionModal(true)}
+                    className="bg-trust-500 hover:bg-trust-600 text-white text-sm py-2 px-4 rounded-lg flex items-center space-x-2 transition-colors"
+                  >
+                    <Wallet className="h-4 w-4" />
+                    <span>Make Contribution</span>
                   </button>
                 </div>
                 
-                <div className="space-y-3">
-                  {mockTransactions.map((transaction) => (
-                    <div key={transaction.id} className="flex items-center justify-between p-4 bg-warm-50 rounded-lg hover:bg-warm-100 transition-colors">
-                      <div className="flex items-center space-x-4">
-                        <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
-                          transaction.type === 'contribution' ? 'bg-trust-100' : 
-                          transaction.type === 'loan_disbursement' ? 'bg-warning-100' : 'bg-success-100'
-                        }`}>
-                          {transaction.type === 'contribution' ? (
-                            <Download className="h-5 w-5 text-trust-600" />
-                          ) : transaction.type === 'loan_disbursement' ? (
-                            <HandCoins className="h-5 w-5 text-warning-600" />
-                          ) : (
-                            <TrendingUp className="h-5 w-5 text-success-600" />
-                          )}
+                {contributionsLoading ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-trust-600 mx-auto mb-2"></div>
+                    <p className="text-warm-500">Loading contributions...</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {contributions.map((contribution) => (
+                      <div key={contribution._id} className="flex items-center justify-between p-4 bg-warm-50 rounded-lg hover:bg-warm-100 transition-colors">
+                        <div className="flex items-center space-x-4">
+                          <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
+                            contribution.status === 'completed' ? 'bg-success-100' : 
+                            contribution.status === 'pending' ? 'bg-warning-100' : 'bg-red-100'
+                          }`}>
+                            <Wallet className={`h-5 w-5 ${
+                              contribution.status === 'completed' ? 'text-success-600' : 
+                              contribution.status === 'pending' ? 'text-warning-600' : 'text-red-600'
+                            }`} />
+                          </div>
+                          <div>
+                            <p className="font-medium text-warm-900 capitalize">
+                              {contribution.mobileMoneyProvider} Contribution
+                            </p>
+                            <p className="text-sm text-warm-500">{contribution.userId?.name}</p>
+                            <p className="text-xs text-warm-400">
+                              Transaction: {contribution.transactionId}
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="font-medium text-warm-900">
-                            {transaction.type === 'contribution' ? 'Contribution' : 
-                             transaction.type === 'loan_disbursement' ? 'Loan Disbursement' : 'Loan Repayment'}
+                        
+                        <div className="text-right">
+                          <p className="font-semibold text-trust-600">
+                            {contribution.amount?.toLocaleString()} UGX
                           </p>
-                          <p className="text-sm text-warm-500">{transaction.memberName}</p>
-                          <p className="text-xs text-warm-400">{transaction.description}</p>
+                          <span className={`bg-${
+                            contribution.status === 'completed' ? 'success' : 
+                            contribution.status === 'pending' ? 'warning' : 'red'
+                          }-100 text-${contribution.status === 'completed' ? 'success' : 
+                            contribution.status === 'pending' ? 'warning' : 'red'}-700 text-xs px-2 py-1 rounded-full capitalize`}>
+                            {contribution.status}
+                          </span>
+                          <p className="text-xs text-warm-400 mt-1">
+                            {new Date(contribution.createdAt).toLocaleDateString()}
+                          </p>
                         </div>
                       </div>
-                      
-                      <div className="text-right">
-                        <p className={`font-semibold ${
-                          transaction.type === 'contribution' ? 'text-trust-600' : 'text-success-600'
-                        }`}>
-                          {transaction.amount.toLocaleString()} UGX
-                        </p>
-                        <span className="bg-success-100 text-success-700 text-xs px-2 py-1 rounded-full">
-                          {transaction.status}
-                        </span>
-                        <p className="text-xs text-warm-400 mt-1">
-                          {new Date(transaction.date).toLocaleDateString()}
-                        </p>
+                    ))}
+                    {contributions.length === 0 && (
+                      <div className="text-center py-12">
+                        <Wallet className="h-16 w-16 text-warm-300 mx-auto mb-4" />
+                        <h4 className="text-lg font-semibold text-warm-700 mb-2">No Contributions Yet</h4>
+                        <p className="text-warm-500 mb-4">Be the first to contribute to this group</p>
+                        <button 
+                          onClick={() => setShowContributionModal(true)}
+                          className="bg-trust-500 hover:bg-trust-600 text-white py-2 px-6 rounded-lg transition-colors flex items-center space-x-2 mx-auto"
+                        >
+                          <Wallet className="h-4 w-4" />
+                          <span>Make First Contribution</span>
+                        </button>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
